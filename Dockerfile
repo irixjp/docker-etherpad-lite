@@ -2,10 +2,12 @@ FROM centos:8
 
 LABEL maintainer "@irix_jp"
 
+RUN sed -i -e 's/^mirrorlist/#mirrorlist/' -e 's/#baseurl/baseurl/' -e 's/mirror.centos.org/vault.centos.org/' /etc/yum.repos.d/CentOS-Linux-BaseOS.repo /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+
 RUN dnf update -y && \
     dnf install -y glibc-all-langpacks git sudo which jq openssl openssl-devel openssl-libs httpd-tools && \
-    dnf module install -y nodejs:10/common && \
-    dnf module install -y nginx:1.14/common && \
+    dnf module install -y nodejs:16/common && \
+    dnf module install -y nginx:1.20/common && \
     dnf clean all
 
 RUN mkdir /etc/nginx/ssl && \
@@ -26,5 +28,8 @@ RUN bin/installDeps.sh && \
 COPY settings.json /eplite/etherpad-lite/settings.json
 COPY eplite.conf /etc/nginx/conf.d/eplite.conf
 COPY init.sh /init.sh
+
+EXPOSE 8080
+EXPOSE 8443
 
 CMD ["bash", "/init.sh"]
