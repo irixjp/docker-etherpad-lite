@@ -1,35 +1,36 @@
-FROM centos:8
+FROM quay.io/centos/centos:stream9
 
 LABEL maintainer "@irix_jp"
 
-RUN sed -i -e 's/^mirrorlist/#mirrorlist/' -e 's/#baseurl/baseurl/' -e 's/mirror.centos.org/vault.centos.org/' /etc/yum.repos.d/CentOS-Linux-BaseOS.repo /etc/yum.repos.d/CentOS-Linux-AppStream.repo
-
+WORKDIR /root
 RUN dnf update -y && \
-    dnf install -y glibc-all-langpacks git sudo which jq openssl openssl-devel openssl-libs httpd-tools && \
-    dnf module install -y nodejs:16/common && \
-    dnf module install -y nginx:1.20/common && \
-    dnf clean all
+    dnf install -y git httpd-tools && \
+    dnf module install -y nodejs:22/common && \
+    dnf module install -y nginx:1.26/common && \
+    npm install -g pnpm
 
-RUN mkdir /etc/nginx/ssl && \
-    openssl req -new -x509 -sha256 -newkey rsa:2048 -days 36500 \
-                -subj '/C=JP/ST=Tokyo/L=Tokyo/O=Eplite Ltd./OU=Web/CN=localhost' \
-                -nodes -out /etc/nginx/ssl/nginx.pem -keyout /etc/nginx/ssl/nginx.key && \
-    chown root:root -R /etc/nginx/ssl/ && \
-    chmod 600 /etc/nginx/ssl/* && \
-    chmod 700 /etc/nginx/ssl
+RUN git clone https://github.com/ether/etherpad-lite.git && \
+    cd etherpad-lite && \
+    git fetch origin master && \
+    git checkout master && \
+    git branch && \
+    pnpm i && \
+    pnpm run build:etherpad
 
-WORKDIR /eplite
-RUN git clone --branch master --depth 1 https://github.com/ether/etherpad-lite.git
-WORKDIR /eplite/etherpad-lite
-RUN bin/installDeps.sh && \
-    npm install sqlite3 && \
-    rm -rf ~/.npm/_cacache
+RUN cd etherpad-lite && \
+    pnpm run plugins i \
+    ep_align \
+    ep_embedded_hyperlinks2 \
+    ep_font_color \
+    ep_headings2
 
-COPY settings.json /eplite/etherpad-lite/settings.json
-COPY eplite.conf /etc/nginx/conf.d/eplite.conf
+RUN touch /etc/nginx/restrictions.conf
+
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY settings.json /root/etherpad-lite/settings.json
 COPY init.sh /init.sh
 
-EXPOSE 8080
-EXPOSE 8443
+EXPOSE 80
+EXPOSE 443
 
 CMD ["bash", "/init.sh"]
